@@ -23,7 +23,7 @@ MCHOSE_Battery/
 ## 交付内容
 
 日常使用只需要安装包 `MCHOSE_Battery_1.1.rmskin`（皮肤 + 插件 DLL），从
-[ Releases ](../../releases) 下载后双击安装。仓库内的源码结构：
+[Releases](https://github.com/kmizmal/mchose-battery/releases) 下载后双击安装。仓库内的源码结构：
 
 | 路径 | 说明 |
 | --- | --- |

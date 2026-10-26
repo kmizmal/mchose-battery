@@ -1,5 +1,7 @@
 # MCHOSE 电量 · Rainmeter 皮肤（C# 插件版）
 
+[![build](https://github.com/kmizmal/mchose-battery/actions/workflows/build.yml/badge.svg)](https://github.com/kmizmal/mchose-battery/actions/workflows/build.yml)
+
 显示迈从 **V7 鼠标** 与 **G87 键盘** 的连接方式、剩余电量、充放电状态，并在掉线/低电时给出明确提示。
 数据由随包安装的原生 **C# 插件** 直接读 HID / BLE，零外部依赖（不需要 Python、hidapi 或中间状态文件）。
 
@@ -338,6 +340,18 @@ python build_plugin.py --arch both    # 两个一起出
 python build_plugin.py --install       # x64 顺带复制到 Rainmeter 的 Plugins 目录
 python build_package.py --install      # 打包 + 安装皮肤与插件
 cd tests/ProtocolTests && dotnet run -c Release   # 175 项协议/状态机断言
+```
+
+### 持续集成
+
+`.github/workflows/build.yml` 在 push 到 main、打 tag、PR 与手动触发时执行：
+跑 175 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
+
+workflow **只构建、不发布**：权限只有 `contents: read`，也刻意不调用任何 Release 接口。
+发版仍由人工执行，避免 CI 拿到写权限：
+
+```bash
+gh release create v1.1.0 dist/MCHOSE_Battery_1.1.rmskin --notes-file notes.md
 ```
 
 两个产物的差异只在 PE 头和 CLR 标志，源码完全相同：

@@ -1,0 +1,13 @@
+# 仓库内统一按文本处理，行尾按规则归一
+* text=auto
+
+# Rainmeter 的 ini/inc 解析器要求逐行 CRLF，这里强制，避免跨平台检出后段落失效
+*.ini text eol=crlf
+*.inc text eol=crlf
+*.txt text eol=crlf
+
+# 二进制文件不做任何转换
+*.exe binary
+*.dll binary
+*.png binary
+*.rmskin binary

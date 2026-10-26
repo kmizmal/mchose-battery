@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Rainmeter 插件必须导出原生符号。这里不依赖 DllExport / DllExporter.exe，
+    而是编译后由 build_plugin.py 做 IL 后处理（ildasm → 注入 .export → ilasm）。
+
+    约束：
+      · 目标框架锁 .NET Framework（net48）—— .NET 5+ 的 PE 头无法被原生宿主直接 LoadLibrary
+      · 平台锁 x64 —— 本机 Rainmeter.exe 的 PE Machine = 0x8664，位数不匹配会静默加载失败
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>MCHOSE_Battery</AssemblyName>
+    <RootNamespace>MchoseBattery</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Deterministic>true</Deterministic>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Product>MCHOSE Battery Rainmeter Plugin</Product>
+    <AssemblyTitle>MCHOSE_Battery</AssemblyTitle>
+    <Version>1.1.0</Version>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <!-- Finalize 是导出名，不能改名 -->
+    <NoWarn>$(NoWarn);CS0465</NoWarn>
+  </PropertyGroup>
+
+</Project>

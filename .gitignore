@@ -1,0 +1,18 @@
+# 构建产物（可由 build_plugin.py / build_package.py 再生）
+**/bin/
+**/obj/
+*.il
+*.export.il
+*.res
+*.cache
+
+# 打包输出：安装包通过 GitHub Release 分发，不入库
+dist/
+
+# 本地临时与备份（含探测脚本、Rainmeter 部署备份）
+.cleanup-backup/
+.workbuddy/
+.codegraph/
+
+# 系统/驱动误在工作目录创建的日志
+NVIDIA Corporation/

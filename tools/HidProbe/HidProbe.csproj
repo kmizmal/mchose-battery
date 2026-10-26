@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>HidProbe</AssemblyName>
+    <RootNamespace>HidProbe</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 直接链接插件源码，用来端到端验证插件自己的采集通道 -->
+    <Compile Include="..\..\src\MchoseBattery\Hid\NativeHid.cs" Link="NativeHid.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\MchoseProtocol.cs" Link="MchoseProtocol.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\G87Protocol.cs" Link="G87Protocol.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\G87Battery.cs" Link="G87Battery.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\HidBattery.cs" Link="HidBattery.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\BleBattery.cs" Link="BleBattery.cs" />
+    <Compile Include="..\..\src\MchoseBattery\StatusModel.cs" Link="StatusModel.cs" />
+  </ItemGroup>
+
+</Project>

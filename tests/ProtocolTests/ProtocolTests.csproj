@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    协议与状态机的可执行测试。
+    直接把插件的源文件链接进来，不复制代码，保证测的就是发布的那份逻辑。
+    这些类型不依赖任何 Windows API，所以可以用 net8.0 跑，不必起 Rainmeter。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>7.3</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ProtocolTests</AssemblyName>
+    <RootNamespace>MchoseV7.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\MchoseBattery\Hid\MchoseProtocol.cs" Link="MchoseProtocol.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\G87Protocol.cs" Link="G87Protocol.cs" />
+    <Compile Include="..\..\src\MchoseBattery\StatusModel.cs" Link="StatusModel.cs" />
+  </ItemGroup>
+
+</Project>

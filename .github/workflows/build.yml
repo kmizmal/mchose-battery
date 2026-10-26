@@ -1,0 +1,66 @@
+name: build
+
+# 只做构建与打包，不创建 Release。发布由人工执行：
+#   gh release create vX.Y.Z dist/MCHOSE_Battery_X.Y.rmskin
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 收紧权限：只需要读代码，明确不授予写权限，杜绝误发 Release
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: |
+            src/MchoseBattery/MchoseBattery.csproj
+            tests/ProtocolTests/ProtocolTests.csproj
+            tools/HidProbe/HidProbe.csproj
+
+      - name: 协议与状态机测试
+        run: dotnet run --project tests/ProtocolTests -c Release
+
+      - name: 构建插件（x64 + x86）
+        run: python build_plugin.py --arch both
+
+      - name: 打包 rmskin
+        run: python build_package.py
+
+      - name: 校验产物
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -File | Format-Table Name, Length -AutoSize
+          Get-ChildItem dist/plugin -File | Format-Table Name, Length -AutoSize
+          $rmskin = Get-ChildItem dist -Filter *.rmskin
+          if (-not $rmskin) { throw "没有生成 rmskin" }
+          if ($rmskin.Length -lt 50KB) { throw "rmskin 体积异常：$($rmskin.Length) 字节" }
+          # .rmskin 末尾必须有 16 字节 footer，key 为 "RMSKIN"
+          $bytes = [IO.File]::ReadAllBytes($rmskin.FullName)
+          $tail = [Text.Encoding]::ASCII.GetString($bytes, $bytes.Length - 7, 7)
+          if ($tail -ne "RMSKIN") { throw "footer 校验失败：$tail" }
+          "footer OK，大小 $($bytes.Length) 字节"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCHOSE_Battery-rmskin
+          path: |
+            dist/*.rmskin
+            dist/plugin/*.dll
+          if-no-files-found: error
+          retention-days: 30

@@ -29,11 +29,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: |
-            src/MchoseBattery/MchoseBattery.csproj
-            tests/ProtocolTests/ProtocolTests.csproj
-            tools/HidProbe/HidProbe.csproj
+          # 不启用 NuGet 缓存：本项目只用框架引用、没有任何 PackageReference，
+          # 缓存目录根本不会生成，post 步骤反而会因路径不存在判失败。
 
       - name: 协议与状态机测试
         run: dotnet run --project tests/ProtocolTests -c Release

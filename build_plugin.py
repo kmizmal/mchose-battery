@@ -29,6 +29,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+# CI（GitHub Actions / 英文 Windows）下 stdout 默认是 cp1252，打印中文会抛
+# UnicodeEncodeError 让整个构建失败。这里统一改成 UTF-8，本机行为不变。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parent
 PROJECT = ROOT / "src" / "MchoseBattery"
 PLUGIN_NAME = "MCHOSE_Battery"

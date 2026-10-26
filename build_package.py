@@ -21,8 +21,14 @@ from __future__ import annotations
 import argparse
 import shutil
 import struct
+import sys
 import zipfile
 from pathlib import Path
+
+# 同 build_plugin.py：CI 的 cp1252 控制台无法输出中文，统一转 UTF-8。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 CONFIG = "MCHOSE_Battery"
 PACKAGE_NAME = "MCHOSE_Battery_1.1"

@@ -20,6 +20,8 @@
     <Compile Include="..\..\src\MchoseBattery\Hid\G87Battery.cs" Link="G87Battery.cs" />
     <Compile Include="..\..\src\MchoseBattery\Hid\HidBattery.cs" Link="HidBattery.cs" />
     <Compile Include="..\..\src\MchoseBattery\Hid\BleBattery.cs" Link="BleBattery.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\V9Protocol.cs" Link="V9Protocol.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\V9Battery.cs" Link="V9Battery.cs" />
     <Compile Include="..\..\src\MchoseBattery\StatusModel.cs" Link="StatusModel.cs" />
   </ItemGroup>
 

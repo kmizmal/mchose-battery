@@ -39,6 +39,7 @@ namespace MchoseBattery.Tests
             TestParseLegacy();
             TestStatusBuilder();
             TestG87();
+            TestV9();
 
             Console.WriteLine();
             Console.WriteLine($"通过 {_passed} 项，失败 {Failures.Count} 项");
@@ -608,6 +609,98 @@ namespace MchoseBattery.Tests
             CheckEqual(s.Charging, StatusCodes.ChgOffline, "BLE 充电态未知 -> charging=2（界面留空）");
             CheckEqual(s.ChargingKnown, false, "BLE ChargingKnown=false");
             CheckEqual(s.Alert, StatusCodes.AlertNone, "BLE 91% 不触发告警");
+        }
+
+        // ------------------------------------------------- V9 Pro 2（官方桌面客户端 HidEQ 0x0B）
+
+        /// <summary>
+        /// 期望值全部取自真机：先用官方客户端把设备页打开，只读监听抓到的原始输入报告，
+        /// 再用同一套字节反推请求、发出去拿到完全一致的回包。
+        /// 抓到的原帧：55 AA 01 01 03 00 01 0B 01 56 5F（0x56 = 86%，与客户端显示一致）。
+        /// </summary>
+        private static void TestV9()
+        {
+            Console.WriteLine("V9Protocol");
+
+            byte[] request = V9Protocol.BuildBatteryRequest();
+            CheckEqual(request.Length, 64, "V9 请求帧长 64");
+            CheckEqual(request[0], (byte)0x55, "V9 报告 ID 0x55");
+            CheckEqual(request[1], (byte)0xAA, "V9 起始符 0xAA");
+            CheckEqual(request[2], (byte)0x01, "V9 协议版本 0x01");
+            CheckEqual(request[3], (byte)0x00, "V9 请求不带校验 flags=0");
+            CheckEqual(request[4], (byte)0x01, "V9 length = payload(0)+1");
+            CheckEqual(request[5], (byte)0x00, "V9 cmdType[0]=0（Request）");
+            CheckEqual(request[6], (byte)0x01, "V9 cmdType[1]=1（Request）");
+            CheckEqual(request[7], (byte)0x0B, "V9 命令 0x0B = GET_BATTERY_SLEEP");
+            CheckEqual(request[8], (byte)0x00, "V9 无校验时校验位写 0");
+            CheckEqual(request[63], (byte)0x00, "V9 请求尾部补零");
+
+            // 校验算法与官方 C() 对齐：01 ^ 03 ^ 00 ^ 01 ^ 0B ^ 01 ^ 56 = 0x5F
+            CheckEqual(
+                V9Protocol.ComputeChecksum(0x01, 0x03, 0x00, 0x01, 0x0B, new byte[] { 0x01, 0x56 }),
+                (byte)0x5F,
+                "V9 抓包帧校验和 0x5F");
+
+            byte[] realReply = Hex("55 AA 01 01 03 00 01 0B 01 56 5F", 64);
+            V9Protocol.BatteryReading reading;
+            bool ok = V9Protocol.TryParseBattery(realReply, out reading);
+            Check(ok, "V9 真机回包可解析");
+            if (ok)
+            {
+                CheckEqual(reading.Percent, 86, "V9 真机回包电量 86%");
+                CheckEqual(reading.Charging, false, "V9 真机回包未充电");
+                CheckEqual(reading.Asleep, false, "V9 真机回包非休眠");
+            }
+
+            // 充电态：bit7 置位，低 7 位仍是电量
+            byte[] charging = Hex("55 AA 01 01 03 00 01 0B 01 D6 DF", 64);
+            ok = V9Protocol.TryParseBattery(charging, out reading);
+            Check(ok, "V9 充电帧可解析");
+            if (ok)
+            {
+                CheckEqual(reading.Charging, true, "V9 bit7=1 判定为充电中");
+                CheckEqual(reading.Percent, 86, "V9 充电时电量仍取低 7 位");
+            }
+
+            // 休眠：payload[0]=0，官方此时把 batteryLevel 置空
+            byte[] asleep = Hex("55 AA 01 01 03 00 01 0B 00 56 5E", 64);
+            ok = V9Protocol.TryParseBattery(asleep, out reading);
+            Check(ok, "V9 休眠帧可解析");
+            if (ok)
+            {
+                CheckEqual(reading.Asleep, true, "V9 payload[0]=0 判定为休眠");
+            }
+
+            // 失败路径：校验错、命令不符、报告 ID 不符、负载过短、通知类型
+            byte[] badChecksum = Hex("55 AA 01 01 03 00 01 0B 01 56 5E", 64);
+            Check(!V9Protocol.TryParseBattery(badChecksum, out reading), "V9 校验和错被拒绝");
+
+            byte[] wrongCmd = Hex("55 AA 01 01 03 00 01 0C 01 56 58", 64);
+            Check(!V9Protocol.TryParseBattery(wrongCmd, out reading), "V9 非 0x0B 命令被拒绝");
+
+            byte[] wrongId = Hex("4D AA 01 01 03 00 01 0B 01 56 5F", 64);
+            Check(!V9Protocol.TryParseBattery(wrongId, out reading), "V9 报告 ID 非 0x55 被拒绝");
+
+            byte[] shortPayload = Hex("55 AA 01 01 02 00 01 0B 56 5A", 64);
+            Check(!V9Protocol.TryParseBattery(shortPayload, out reading), "V9 负载不足 2 字节被拒绝");
+
+            byte[] notify = Hex("55 AA 01 01 03 00 04 0B 01 56 5A", 64);
+            Check(!V9Protocol.TryParseBattery(notify, out reading), "V9 通知类型 [0,4] 不当作应答");
+
+            Check(!V9Protocol.TryParseBattery(null, out reading), "V9 null 输入不抛异常");
+            Check(!V9Protocol.TryParseBattery(new byte[4], out reading), "V9 过短报告不抛异常");
+        }
+
+        /// <summary>把十六进制串转成定长报告，便于用真实抓包字节写断言。</summary>
+        private static byte[] Hex(string text, int length)
+        {
+            var result = new byte[length];
+            string[] parts = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length && i < length; i++)
+            {
+                result[i] = Convert.ToByte(parts[i], 16);
+            }
+            return result;
         }
     }
 }

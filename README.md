@@ -2,25 +2,26 @@
 
 [![build](https://github.com/kmizmal/mchose-battery/actions/workflows/build.yml/badge.svg)](https://github.com/kmizmal/mchose-battery/actions/workflows/build.yml)
 
-显示迈从 **V7 鼠标** 与 **G87 键盘** 的连接方式、剩余电量、充放电状态，并在掉线/低电时给出明确提示。
+显示迈从 **V7 鼠标**、**G87 键盘** 与 **V9 Pro 2 耳机** 的连接方式、剩余电量、充放电状态，并在掉线/低电时给出明确提示。
 数据由随包安装的原生 **C# 插件** 直接读 HID / BLE，零外部依赖（不需要 Python、hidapi 或中间状态文件）。
 
 > **免责声明**：本项目是第三方开源项目，与迈从（MCHOSE）官方**没有任何关系**，也未获得其授权或认可。
 > 插件只通过公开的 HID / BLE 接口**读取**设备上报的电量与连接状态，不修改固件、不写入配置、
-> 不改变设备任何行为。MCHOSE、V7、G87 等名称、产品外观与商标均归迈从所有，仓库内的产品图
+> 不改变设备任何行为。MCHOSE、V7、G87、V9 等名称、产品外观与商标均归迈从所有，仓库内的产品图
 > 仅用于皮肤界面展示。使用本项目的风险由使用者自行承担，详见文末[许可证](#许可证)一节。
 
-一套皮肤里放两张卡片，各管各的设备：
+一套皮肤里放三张卡片，各管各的设备：
 
 ```
 MCHOSE_Battery/
 ├─ @Resources/                共用资源（Variables.inc、产品图、说明）
 ├─ Mouse/V7Battery.ini        Config = MCHOSE_Battery\Mouse
-└─ Keyboard/G87Battery.ini    Config = MCHOSE_Battery\Keyboard
+├─ Keyboard/G87Battery.ini    Config = MCHOSE_Battery\Keyboard
+└─ Headset/V9Battery.ini      Config = MCHOSE_Battery\Headset
 ```
 
-> 必须拆成两个子目录：Rainmeter 里**同一 Config 下的 variant 是互斥的**，
-> 两个 `.ini` 放同一目录时，加载第二个会把第一个替换掉。
+> 必须拆成独立子目录：Rainmeter 里**同一 Config 下的 variant 是互斥的**，
+> 多个 `.ini` 放同一目录时，加载后一个会把前一个替换掉。
 
 ## 交付内容
 
@@ -35,9 +36,9 @@ MCHOSE_Battery/
 | `tools/ilasm/` | `ildasm` / `ilasm`，用于给托管 DLL 注入原生导出 |
 | `build_plugin.py` | 构建插件：`dotnet build` → `ildasm` → 注入 `.export` → `ilasm` → 校验 |
 | `build_package.py` | 打包：编码转换 → 生成 `RMSKIN.ini` → 压缩 → 追加 footer → 自检 |
-| `tests/ProtocolTests/` | 协议与状态机的可执行测试（175 项） |
+| `tests/ProtocolTests/` | 协议与状态机的可执行测试（203 项） |
 | `preview.png` | 实际运行截图 |
-| `make_icons.py` | 生成卡片配色图标（8 张产品图） |
+| `make_icons.py` | 生成卡片配色图标（12 张产品图） |
 
 `dist/` 与各项目的 `bin/`、`obj/` 都是可再生产物，不入库，按[第六节](#六构建)重新生成。
 
@@ -282,6 +283,63 @@ recv  13 4A 01 00 02 64 01 … C5      ← 电量 = 0x64 = 100%，未充电
 状态码新增 `ModeBluetooth = 3`，配合皮肤 `Substitute` 的 `"^3$":"蓝牙"`；
 `2` 仍然是「未知」，掉线/异常不会被误显示成蓝牙。
 
+### V9 Pro 2 耳机：第三套协议（0x55 / 0xAA）
+
+耳机与 V7 共用 VID `0x3837`，但协议和鼠标/键盘都**不兼容**。设备身份：
+
+| 项 | 值 |
+| --- | --- |
+| VID / PID | `0x3837 / 0x6011`（十进制 14391 / 24593） |
+| 厂商集合 | `usagePage 0xFF07`、`usage 0x0222`、`mi_03` |
+| 报告长度 | In = Out = **64**，**Feat = 0**（没有 Feature 通道） |
+| 报告 ID | **0x55** |
+
+报文体（整条 64 字节报告里，`[0]` 是报告 ID）：
+
+```
+[0]      0x55            报告 ID
+[1]      0xAA            起始符
+[2]      0x01            协议版本
+[3]      flags           0 = 不带校验，1 = 末位为 XOR 校验
+[4]      length          payload 长度 + 1
+[5..6]   cmdType         请求/应答 [0,1]、设置 [0,2]、通知 [0,4]、OTA [0,6]
+[7]      cmd             命令字
+[8..]    payload
+[8+len-1]                XOR 校验（flags = 1 时有效）
+```
+
+校验算法：`flags ^ length ^ cmdType[0] ^ cmdType[1] ^ cmd ^ payload 全部字节`。
+
+电量与休眠是命令 **`0x0B`（GET_BATTERY_SLEEP）**，负载两字节：
+`payload[0]` 休眠态（0 = 休眠）、`payload[1]` **bit7 = 充电、低 7 位 = 电量百分比**。
+
+本机实测（2026-10-27，`55 AA` 为起始符，前面 `55` 是报告 ID）：
+
+```
+send  55 AA 01 00 01 00 01 0B 00 …                                   ← 96 ms
+recv  55 AA 01 01 03 00 01 0B 01 56 5F …                             ← 86%，未充电
+```
+
+`0x56 & 0x7F = 86`，与官方客户端同一时刻显示的 86% 一致；
+XOR 复算 `01^03^00^01^0B^01^56 = 0x5F`，与帧尾校验位吻合。
+
+实现要点：
+
+- **主动问，不能等**：官方客户端是按需查询（进设备页/点刷新才发一次），没有周期心跳。
+  实测在设备页停留 180 秒、四路接口同时只读监听，客户端一句都没说；
+  只有触发一次页面重进才抓到上述帧。所以插件必须主动发 `0x0B`。
+- **不能套用 0x4D 家族**：初始按鼠标的 `0x4D + 0x0900` 发过一次，写入成功但零回包——
+  该设备是 BES 方案，命令空间完全不同。**发送成功 ≠ 协议正确**。
+- **休眠语义对齐官方**：`payload[0] = 0` 时官方把 `batteryLevel` 置空，
+  插件同样返回 `reason = "asleep"`，不编造数值。
+- **只支持接收器（2.4G）**：耳机蓝牙档只有经典音频 + 一个 SPP 串口（本机映射为 COM6），
+  没有厂商 HID 集合，也没有系统电池属性，详见[已知限制](#八已知限制)。
+
+协议常量的证据来自官方桌面客户端远程下发的设备页脚本（`app.asar` 内主进程是 V8 字节码，
+不含协议；真正的实现随页面从 CDN 加载）：`crc32-BlQnRCeo.js` 是帧构造/校验/解析本体，
+`eq-DcwrcT_4.js` 定义 `GET_BATTERY_SLEEP = 11`、`reportId = 85`，
+`headsetPage-DNy5Z21r.js` 是调用点。三者都可用客户端日志里的 URL 复现。
+
 ## 三、状态与提醒规则
 
 | 情形 | 判定 | 视觉 |
@@ -293,7 +351,7 @@ recv  13 4A 01 00 02 64 01 … C5      ← 电量 = 0x64 = 100%，未充电
 | 数据异常 | `state=2` | 同样保留旧值，「异常」+「读取异常，点击卡片重试」 |
 
 **断开不清零**：最后一次成功读取的 `percent / mode / updated` 存进缓存文件
-（鼠标 `@Resources\v7-state.txt`、键盘 `@Resources\g87-state.txt`，两卡必须分开），
+（鼠标 `v7-state.txt`、键盘 `g87-state.txt`、耳机 `v9-state.txt`，三卡必须分开），
 掉线或重启 Rainmeter 后继续沿用；只有从未读成功过才显示 `--`。
 
 提示音默认关闭。`Variables.inc` 里 `SoundOn=1` 可开启：低电首次触发响一次，之后每小时最多一次，
@@ -391,6 +449,8 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
 | 数字显示乱码 | `GetString` 导出签名写错 | 必须是 `LPCWSTR GetString(void* data)`，不是 `void GetString(data, WCHAR**, BOOL)` |
 | 中文乱码 | `.ini` 被存成 UTF-8 | 用 `build_package.py` 生成，不要手工另存 |
 | 插件替换不生效 | DLL 被 Rainmeter 占用 | 退出 Rainmeter 再复制，或重启宿主 |
+| 耳机卡片一直「已断开」 | 耳机连着蓝牙、没连上接收器 | 把耳机拨到 2.4G 并确认官方客户端能识别；接收器枚举正常不代表链路已建立 |
+| 耳机写入成功但零回包 | 套用了鼠标 `0x4D` / 键盘 `0x13` 帧 | 耳机是 `0x55` 报告 + `0xAA` 起始符 + 命令 `0x0B` |
 | 刷新节奏不对 | 改了 `RefreshMinutes` 没刷新皮肤 | 右键 → 刷新皮肤 |
 
 ## 八、已知限制
@@ -423,6 +483,14 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
 
    注：**仅插 USB 线不改变档位** —— 那是充电，数据链路不变。
    蓝牙档没有厂商 HID 通道，只能读 GATT 百分比；充电状态未知，界面不显示。
+7. **V9 Pro 2 耳机目前只支持 2.4G 接收器档**：
+   - 接收器插着就一直枚举 `3837/0x6011` 的 `0xFF07` 通道，但**只有耳机真的连上接收器才代答**。
+     耳机没连上（比如切到蓝牙、或需要重新配对）时表现与鼠标一致：接口在、问不答 → 「已断开」。
+   - **蓝牙档无法支持**：该档下耳机只有经典蓝牙音频（A2DP/HFP）与一个 SPP 串口
+     （本机映射为 COM6，用 `00001101` 标准 SPP + VID `02B0`），
+     既没有厂商 HID 集合，系统也没有暴露电池属性（`{104EA319-…},2` 为空，HFP 节点同样为空）；
+     串口实测 10 秒无任何主动上报，属于「必须先有请求帧才能问」的通道，目前无公开证据可依。
+   - 耳机没有 Feature 报告，`GetFeature` 路径不可用；别套用鼠标的 `0x4D` 或键盘的 `0x13`。
 
 ## 许可证
 

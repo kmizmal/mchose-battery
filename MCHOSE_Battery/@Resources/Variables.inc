@@ -6,12 +6,15 @@
 ; ---------- 数据源 ----------
 ; 数据由 C# 插件 MCHOSE_Battery.dll 直接读 HID，没有外部进程、不需要 Python。
 ; 插件位置：Rainmeter 安装目录的 Plugins\MCHOSE_Battery.dll（安装包会自动放好）。
-; 设备选择（两张卡片各用一个，Rainmeter 里是两张独立皮肤，可同时加载）：
+; 设备选择（三张卡片各用一个，Rainmeter 里是三张独立皮肤，可同时加载）：
 ;   auto = 先探 G87 键盘，探不到再回落 V7 鼠标
 ;   g87 / keyboard = 只查 G87 键盘
 ;   v7  / mouse    = 只查 V7 鼠标
+;   v9  / headset  = 只查 V9 Pro 2 耳机（走接收器 3837/6011 的 0x55 协议）
+;   耳机不参与 auto：它和鼠标共用 VID 但协议完全不同，混进 auto 会让卡片互相抢设备。
 DeviceMouse=v7
 DeviceKeyboard=g87
+DeviceHeadset=v9
 ; 采集间隔（分钟）。电量按小时变化，20 分钟一次足够；
 ; 代价是掉线最多要 20 分钟才发现，想及时就在卡片上左键手动刷新一次。
 RefreshMinutes=20
@@ -41,6 +44,10 @@ BarY=96
 Colorway=pink
 ; 与 Colorway 一一对应的序号，中键循环时用，不要单独改
 ColorIndex=3
+; 耳机（V9 Pro 2）单独一套四档配色：blue / black / red / green。
+; 官方耳机没有白色，所以不共用上面那组；两张卡各自循环、互不影响。
+ColorwayHeadset=blue
+ColorIndexHeadset=0
 ; 以下颜色由皮肤按状态自动改写，这里只是初始值（暗色主题）
 Accent=78,160,255,255
 Dot=62,214,152,255

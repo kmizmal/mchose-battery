@@ -18,6 +18,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\MchoseBattery\Hid\MchoseProtocol.cs" Link="MchoseProtocol.cs" />
     <Compile Include="..\..\src\MchoseBattery\Hid\G87Protocol.cs" Link="G87Protocol.cs" />
+    <Compile Include="..\..\src\MchoseBattery\Hid\V9Protocol.cs" Link="V9Protocol.cs" />
     <Compile Include="..\..\src\MchoseBattery\StatusModel.cs" Link="StatusModel.cs" />
   </ItemGroup>
 

@@ -164,6 +164,7 @@ namespace MchoseBattery
         /// <summary>
         /// 按桶里的 Device 选项选择采集通道。
         /// auto：先探 G87 键盘，再回落到 V7 鼠标；两者都不在线时回退 V7 的提示文案。
+        /// 耳机不走 auto —— 它是 3837 家族里的另一套 64 字节 0x55 协议，必须显式 v9/headset。
         /// </summary>
         private static CollectResult QueryDevice(DeviceSlot slot)
         {
@@ -179,6 +180,10 @@ namespace MchoseBattery
                 case "v7":
                 case "mouse":
                     return HidBattery.Query(windowMs, budgetMs);
+
+                case "v9":
+                case "headset":
+                    return V9Battery.Query(windowMs);
 
                 default:
                     CollectResult keyboard = G87Battery.Query(windowMs);

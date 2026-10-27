@@ -43,6 +43,17 @@ ICON_H = 104        # 2× 显示高度（鼠标图按 H=52 使用，高 DPI 下�
 ICON_W = 84         # 2× 显示宽度（键盘图按 W=42 使用）
 PAD_RATIO = 0.04    # 裁剪后补的内边距，占短边比例
 
+# V9 Pro 2 耳机：官方图同样是横向（640×352），但耳机较宽，按宽度收到 120 像素，
+# 否则会压到右上角的连接状态胶囊。四档取官方在售配色（蓝/黑/红/绿）。
+HEADSET_COLORWAYS = {
+    "blue": "https://cdn.mchose.com.cn/configCenter/static/images/v9pro2Blue_053d13dc0a47.png",
+    "black": "https://cdn.mchose.com.cn/configCenter/static/images/v9pro2Black_c978f09baa6b.png",
+    "red": "https://cdn.mchose.com.cn/configCenter/static/images/v9pro2Red_e88e7804b984.png",
+    "green": "https://cdn.mchose.com.cn/configCenter/static/images/v9pro2Green_222954fd35a4.png",
+}
+
+ICON_W_HS = 120     # 2× 显示宽度（耳机图按 W=60 使用）
+
 ROOT = Path(__file__).resolve().parent
 CACHE = ROOT / "_icon_src"
 OUT = ROOT / "MCHOSE_Battery" / "@Resources" / "Images"
@@ -78,6 +89,17 @@ def scale_w(image: Image.Image) -> Image.Image:
     return image.resize((ICON_W, height), Image.LANCZOS)
 
 
+def scale_ws(image: Image.Image) -> Image.Image:
+    """横向图等比装进固定框（耳机用）：先按高度约束，超宽再按宽度收。"""
+    box_h = 88
+    height = box_h
+    width = max(1, round(image.width * height / image.height))
+    if width > ICON_W_HS:
+        width = ICON_W_HS
+        height = max(1, round(image.height * width / image.width))
+    return image.resize((width, height), Image.LANCZOS)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     for name, url in COLORWAYS.items():
@@ -93,6 +115,13 @@ def main() -> int:
         target = OUT / f"keyboard-{name}.png"
         icon.save(target, optimize=True)
         print(f"keyboard-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB")
+
+    for name, url in HEADSET_COLORWAYS.items():
+        src = fetch(url, CACHE / f"V9P2_{name}.png")
+        icon = scale_ws(trim(src))
+        target = OUT / f"headset-{name}.png"
+        icon.save(target, optimize=True)
+        print(f"headset-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB")
 
     return 0
 

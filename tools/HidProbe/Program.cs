@@ -346,7 +346,7 @@ namespace HidProbe
         {
             if (args.Length == 0)
             {
-                Console.WriteLine("用法: HidProbe list | scan | info | raw");
+                Console.WriteLine("用法: HidProbe list | scan | info | raw | find | listen");
                 return;
             }
 
@@ -417,6 +417,23 @@ namespace HidProbe
                 return;
             }
 
+            if (cmd == "v9")
+            {
+                // 调插件自己的 V9Battery.Query()，验证发布的那份实现
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                MchoseBattery.CollectResult r = MchoseBattery.Hid.V9Battery.Query(
+                    opts.ContainsKey("ms") ? int.Parse(opts["ms"], CultureInfo.InvariantCulture) : 800);
+                sw.Stop();
+                Console.WriteLine("ok       : {0}", r.Ok);
+                Console.WriteLine("percent  : {0}", r.Percent);
+                Console.WriteLine("charging : {0}", r.Charging);
+                Console.WriteLine("mode     : {0}", r.ConnectMode);
+                Console.WriteLine("reason   : {0}", r.Reason);
+                Console.WriteLine("detail   : {0}", r.Detail);
+                Console.WriteLine("耗时     : {0} ms", sw.ElapsedMilliseconds);
+                return;
+            }
+
             if (cmd == "list")
             {
                 PrintList(all, vid);
@@ -441,6 +458,90 @@ namespace HidProbe
                 return;
             }
 
+            if (cmd == "listenall")
+            {
+                // listenall --vid 0x3837 --pid 0x6011 [--ms 60000]
+                // 同时挂在该设备所有接口上只读监听，用来判断客户端到底走哪个集合。
+                int apid = opts.ContainsKey("pid") ? ParseHex(opts["pid"]) : -1;
+                var devs = new List<Dev>();
+                foreach (Dev d in all)
+                {
+                    if (vid >= 0 && d.Vid != vid) continue;
+                    if (apid >= 0 && d.Pid != apid) continue;
+                    if (upage >= 0 && d.UsagePage != upage) continue;
+                    devs.Add(d);
+                }
+                if (devs.Count == 0) { Console.WriteLine("无匹配接口"); return; }
+
+                var stop = new System.Threading.ManualResetEventSlim(false);
+                var threads = new List<System.Threading.Thread>();
+                foreach (Dev d in devs)
+                {
+                    Dev dev = d;
+                    var th = new System.Threading.Thread(() =>
+                    {
+                        using (var ch = Channel.Open(dev.Path))
+                        {
+                            if (!ch.Ok)
+                            {
+                                Console.WriteLine("[UP={0:X4}] 打开失败", dev.UsagePage);
+                                return;
+                            }
+                            Console.WriteLine("[UP={0:X4} in={1} out={2}] 监听中", dev.UsagePage, dev.InLen, dev.OutLen);
+                            while (!stop.IsSet)
+                            {
+                                byte[] r = ch.Read(300);
+                                if (r == null) continue;
+                                lock (Console.Out)
+                                {
+                                    Console.WriteLine("[UP={0:X4} {1}B @{2}] {3}",
+                                        dev.UsagePage, r.Length,
+                                        DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture), Hex(r));
+                                }
+                            }
+                        }
+                    });
+                    th.IsBackground = true;
+                    th.Start();
+                    threads.Add(th);
+                }
+
+                System.Threading.Thread.Sleep(ms);
+                stop.Set();
+                foreach (var th in threads) th.Join(2000);
+                Console.WriteLine("-- 全部结束 --");
+                return;
+            }
+
+            if (cmd == "listen")
+            {
+                // listen --path <p> [--ms 12000]
+                // 只读：挂在通道上听输入报告，一帧都不发。
+                // 用途：官方客户端正在轮询时，把它的回包帧原样抓下来当协议证据。
+                string path = opts.ContainsKey("path") ? opts["path"] : null;
+                if (string.IsNullOrEmpty(path))
+                {
+                    Console.WriteLine("需要 --path");
+                    return;
+                }
+                using (var ch = Channel.Open(path))
+                {
+                    if (!ch.Ok) { Console.WriteLine("打开失败"); return; }
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    Console.WriteLine("-- 监听 {0}ms（只读，不发送）--", ms);
+                    int count = 0;
+                    while (sw.ElapsedMilliseconds < ms)
+                    {
+                        byte[] r = ch.Read(500);
+                        if (r == null) continue;
+                        count++;
+                        Console.WriteLine("recv @{0}ms [{1}]: {2}", sw.ElapsedMilliseconds, r.Length, Hex(r));
+                    }
+                    Console.WriteLine("-- 结束 {0}ms，命中 {1} 帧 --", sw.ElapsedMilliseconds, count);
+                }
+                return;
+            }
+
             if (cmd == "raw")
             {
                 string path = opts.ContainsKey("path") ? opts["path"] : null;
@@ -454,7 +555,8 @@ namespace HidProbe
                 {
                     if (!ch.Ok) { Console.WriteLine("打开失败"); return; }
                     Console.WriteLine("send   : {0}", Hex(frame));
-                    ch.Write(frame);
+                    bool wrote = ch.Write(frame);
+                    Console.WriteLine("write  : {0}", wrote ? "OK" : "失败");
                     for (int i = 0; i < 8; i++)
                     {
                         byte[] r = ch.Read(ms);

@@ -22,11 +22,13 @@ jobs:
       PYTHONUTF8: "1"
 
     steps:
+      # action 统一用 v5：这一代起跑在 Node 24 上，v4 会在日志里报
+      # 「Node.js 20 is deprecated」。GitHub 托管 runner 均满足 v5 的最低 runner 版本要求。
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 安装 .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
           # 不启用 NuGet 缓存：本项目只用框架引用、没有任何 PackageReference，
@@ -56,7 +58,7 @@ jobs:
           "footer OK，大小 $($bytes.Length) 字节"
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: MCHOSE_Battery-rmskin
           path: |

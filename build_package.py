@@ -31,7 +31,7 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 CONFIG = "MCHOSE_Battery"
-PACKAGE_NAME = "MCHOSE_Battery_1.1"
+PACKAGE_NAME = "MCHOSE_Battery_1.2"
 PLUGIN_NAME = "MCHOSE_Battery"
 UTF16_SUFFIXES = {".ini", ".inc"}
 
@@ -44,7 +44,7 @@ RAINMETER_PLUGINS = Path.home() / "AppData" / "Local" / "Programs" / "Rainmeter"
 RMSKIN_INI = """[rmskin]
 Name=MCHOSE Battery
 Author=WorkBuddy
-Version=1.1
+Version=1.2
 LoadType=Skin
 Load={config}\\Keyboard\\G87Battery.ini
 MinimumRainmeter=4.5

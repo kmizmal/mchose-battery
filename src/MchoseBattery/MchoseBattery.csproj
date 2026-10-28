@@ -22,7 +22,7 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Product>MCHOSE Battery Rainmeter Plugin</Product>
     <AssemblyTitle>MCHOSE_Battery</AssemblyTitle>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <!-- Finalize 是导出名，不能改名 -->

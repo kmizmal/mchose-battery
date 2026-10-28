@@ -25,7 +25,7 @@ MCHOSE_Battery/
 
 ## 交付内容
 
-日常使用只需要安装包 `MCHOSE_Battery_1.1.rmskin`（皮肤 + 插件 DLL），从
+日常使用只需要安装包 `MCHOSE_Battery_1.2.rmskin`（皮肤 + 插件 DLL），从
 [Releases](https://github.com/kmizmal/mchose-battery/releases) 下载后双击安装。仓库内的源码结构：
 
 | 路径 | 说明 |
@@ -407,19 +407,19 @@ python build_plugin.py --arch x86     # x86 -> dist/plugin/MCHOSE_Battery-32.dll
 python build_plugin.py --arch both    # 两个一起出
 python build_plugin.py --install       # x64 顺带复制到 Rainmeter 的 Plugins 目录
 python build_package.py --install      # 打包 + 安装皮肤与插件
-cd tests/ProtocolTests && dotnet run -c Release   # 175 项协议/状态机断言
+cd tests/ProtocolTests && dotnet run -c Release   # 212 项协议/状态机断言
 ```
 
 ### 持续集成
 
 `.github/workflows/build.yml` 在 push 到 main、打 tag、PR 与手动触发时执行：
-跑 175 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
+跑 212 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
 
 workflow **只构建、不发布**：权限只有 `contents: read`，也刻意不调用任何 Release 接口。
 发版仍由人工执行，避免 CI 拿到写权限：
 
 ```bash
-gh release create v1.1.0 dist/MCHOSE_Battery_1.1.rmskin --notes-file notes.md
+gh release create v1.2.0 dist/MCHOSE_Battery_1.2.rmskin --notes-file notes.md
 ```
 
 两个产物的差异只在 PE 头和 CLR 标志，源码完全相同：

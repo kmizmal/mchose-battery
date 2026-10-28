@@ -22,8 +22,12 @@ jobs:
       PYTHONUTF8: "1"
 
     steps:
-      # action 统一用 v5：这一代起跑在 Node 24 上，v4 会在日志里报
-      # 「Node.js 20 is deprecated」。GitHub 托管 runner 均满足 v5 的最低 runner 版本要求。
+      # 运行时的版本要求不一致，别强行拉齐：
+      #   checkout / setup-dotnet 从 v5 起就默认跑在 Node 24；
+      #   upload-artifact 的 v5 只是「预备支持」，默认仍是 Node 20，
+      #   要到 v6（runs.using: node24）才真正切换。
+      # 三者都不满足时会报「Node.js 20 is deprecated」。
+      # 最低 runner 版本：v5/v6 均要求 GitHub 托管 runner（≥ 2.327.1），本项目满足。
       - name: 检出源码
         uses: actions/checkout@v5
 
@@ -58,7 +62,7 @@ jobs:
           "footer OK，大小 $($bytes.Length) 字节"
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: MCHOSE_Battery-rmskin
           path: |

@@ -120,6 +120,7 @@ agent_created: true
 | 换连接方式后设备消失 | 蓝牙走 BLE 身份（VID 常变），别再用 USB VID 做硬判据 |
 | 蓝牙首次查询超时、之后正常 | BLE 链路唤醒 1s+，窗口下限要抬到 1500ms |
 | 蓝牙档 HID 只有标准集合、没有 FFxx | 无厂商通道，改读 BLE GATT 电池属性 |
+| 某档位连官方客户端都识别不到 | 该档没有控制通道（常是「蓝牙=纯音频」），不是实现缺陷；先问官方软件认不认 |
 | 插件界面不更新 | 宿主加载旧 DLL；查 .Modules 路径 + 哈希 |
 | 皮肤段落不解析/乱码 | ini 是否 CRLF；是否 UTF-16 LE + BOM |
 | 客户端 asar 读不出来 | 先复测；`ERROR_DEV_NOT_EXIST`/`IN_PAGE_ERROR` 常是瞬时故障 |

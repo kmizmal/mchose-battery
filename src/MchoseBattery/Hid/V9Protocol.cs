@@ -30,8 +30,27 @@ namespace MchoseBattery.Hid
         /// <summary>接收器与耳机本体共用迈从 VID。</summary>
         internal const int VendorId = 0x3837;
 
-        /// <summary>V9 Pro 2 的 USB PID（十进制 24593，与官方设备表一致）。</summary>
+        /// <summary>V9 Pro 2 的接收器 PID（十进制 24593，2.4G 档，产品串 `MCHOSE V9 Pro 2`）。</summary>
         internal const int ProductId = 0x6011;
+
+        /// <summary>
+        /// 有线档 PID（十进制 24592，产品串 `MCHOSE V9 Pro 2 HEADSET`）。
+        /// 插 USB-C 直连时整套身份更换：接口布局与报告 ID 完全一致，只有 PID 与产品串不同。
+        /// 实测同一帧在两档下逐字节同构：`… 01 56 5F`（86%，放电）与 `… 01 D6 DF`（86%，充电）。
+        /// </summary>
+        internal const int WiredProductId = 0x6010;
+
+        /// <summary>两个 PID 都属于 V9 Pro 2。</summary>
+        internal static bool IsHeadsetProduct(int productId)
+        {
+            return productId == ProductId || productId == WiredProductId;
+        }
+
+        /// <summary>按 PID 判连接方式：有线身份 0x6010 → 有线，其余 → 2.4G。</summary>
+        internal static string ConnectModeFor(int productId)
+        {
+            return productId == WiredProductId ? "有线" : "2.4G";
+        }
 
         /// <summary>厂商用途页。实测 0xFF07，与鼠标(0xFF01)、键盘(0xFF00/0xFF04)都不同。</summary>
         internal const int UsagePage = 0xFF07;

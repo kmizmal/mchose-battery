@@ -6,7 +6,8 @@ using System.Runtime.InteropServices;
 namespace MchoseBattery.Hid
 {
     /// <summary>
-    /// V9 Pro 2 耳机（3837/6011，厂商集合 0xFF07，报告 ID 0x55）的通道层与调度。
+    /// V9 Pro 2 耳机（VID 3837，厂商集合 0xFF07，报告 ID 0x55）的通道层与调度。
+    /// 两种身份共用同一套帧：`0x6011` 接收器（2.4G）、`0x6010` 耳机本体（有线）。
     ///
     /// 与鼠标/键盘的差别：
     ///   · 该集合没有 Feature 报告（feat = 0），只能走 64 字节输出报告 + 输入报告回包；
@@ -38,7 +39,7 @@ namespace MchoseBattery.Hid
                 {
                     Ok = false,
                     Reason = "absent",
-                    Detail = "未找到 VID_3837/PID_6011 的 0xFF07 厂商接口",
+                    Detail = "未找到 VID_3837 的 0xFF07 厂商接口（6011 接收器 / 6010 有线）",
                 };
             }
 
@@ -101,10 +102,15 @@ namespace MchoseBattery.Hid
                         continue;
                     }
 
-                    // 路径里带 vid/pid，先做一次廉价过滤，避免为每个 HID 接口都开句柄
+                    // 路径里带 vid/pid，先做一次廉价过滤，避免为每个 HID 接口都开句柄。
+                    // 6011 = 接收器（2.4G），6010 = 耳机本体（有线），两档都要认。
                     string low = path.ToLowerInvariant();
-                    if (low.IndexOf("vid_3837", StringComparison.Ordinal) < 0
-                        || low.IndexOf("pid_6011", StringComparison.Ordinal) < 0)
+                    if (low.IndexOf("vid_3837", StringComparison.Ordinal) < 0)
+                    {
+                        continue;
+                    }
+                    if (low.IndexOf("pid_6011", StringComparison.Ordinal) < 0
+                        && low.IndexOf("pid_6010", StringComparison.Ordinal) < 0)
                     {
                         continue;
                     }
@@ -121,7 +127,19 @@ namespace MchoseBattery.Hid
                 NativeHid.SetupDiDestroyDeviceInfoList(set);
             }
 
+            // 有线(0x6010) 排前：插着线时它秒回，接收器那条即使仍在枚举也不代答，
+            // 先试无用的通道会白等满重试窗口。
+            targets.Sort(delegate(DeviceTarget a, DeviceTarget b)
+            {
+                return ChannelRank(a.ProductId).CompareTo(ChannelRank(b.ProductId));
+            });
+
             return targets;
+        }
+
+        private static int ChannelRank(int productId)
+        {
+            return productId == V9Protocol.WiredProductId ? 0 : 1;
         }
 
         private static string GetDevicePath(IntPtr set, ref NativeHid.SpDeviceInterfaceData did)
@@ -172,7 +190,11 @@ namespace MchoseBattery.Hid
                 {
                     return false;
                 }
-                if (attributes.VendorId != V9Protocol.VendorId || attributes.ProductId != V9Protocol.ProductId)
+                if (attributes.VendorId != V9Protocol.VendorId)
+                {
+                    return false;
+                }
+                if (!V9Protocol.IsHeadsetProduct(attributes.ProductId))
                 {
                     return false;
                 }
@@ -268,9 +290,10 @@ namespace MchoseBattery.Hid
                         Percent = reading.Percent,
                         Charging = reading.Charging,
                         ChargingKnown = true,
-                        ConnectMode = "2.4G",
+                        ConnectMode = V9Protocol.ConnectModeFor(target.ProductId),
                         Reason = "ok",
-                        Detail = "Report 0x55 · cmd 0x0B",
+                        Detail = string.Format(
+                            "PID 0x{0:X4} · Report 0x55 · cmd 0x0B", target.ProductId),
                     };
                 }
             }

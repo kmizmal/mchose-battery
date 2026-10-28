@@ -689,6 +689,24 @@ namespace MchoseBattery.Tests
 
             Check(!V9Protocol.TryParseBattery(null, out reading), "V9 null 输入不抛异常");
             Check(!V9Protocol.TryParseBattery(new byte[4], out reading), "V9 过短报告不抛异常");
+
+            // 两种身份：0x6011 接收器（2.4G）、0x6010 耳机本体（有线），共用同一套帧
+            Check(V9Protocol.IsHeadsetProduct(0x6011), "V9 接收器 PID 属于耳机");
+            Check(V9Protocol.IsHeadsetProduct(0x6010), "V9 有线 PID 属于耳机");
+            Check(!V9Protocol.IsHeadsetProduct(0x1016), "V7 鼠标 PID 不属于耳机");
+            CheckEqual(V9Protocol.ConnectModeFor(0x6011), "2.4G", "V9 接收器 -> 2.4G");
+            CheckEqual(V9Protocol.ConnectModeFor(0x6010), "有线", "V9 有线身份 -> 有线");
+
+            // 有线档真机回包：0xD6 的 bit7 置位 = 充电中，低 7 位仍为 86
+            byte[] wiredCharging = Hex("55 AA 01 01 03 00 01 0B 01 D6 DF", 64);
+            ok = V9Protocol.TryParseBattery(wiredCharging, out reading);
+            Check(ok, "V9 有线档充电动画帧可解析");
+            if (ok)
+            {
+                CheckEqual(reading.Charging, true, "V9 有线档判定为充电中");
+                CheckEqual(reading.Percent, 86, "V9 有线档电量 86%");
+                CheckEqual(reading.Asleep, false, "V9 有线档非休眠");
+            }
         }
 
         /// <summary>把十六进制串转成定长报告，便于用真实抓包字节写断言。</summary>

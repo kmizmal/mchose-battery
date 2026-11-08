@@ -731,6 +731,10 @@ namespace MchoseBattery.Tests
                 "BTHENUM\\{0000111E-0000-1000-8000-00805F9B34FB}_LOCALMFG&0002" +
                 "\\8&389A8148&0&151219004617_C00000000";
             string hfpOtherName = "Furina Endless Solo of Solitude Hands-Free AG";
+            // 另一只耳机同样挂在 HFP 服务下——说明「有 HFP 节点」本身不足以认设备，
+            // 必须靠名字；否则会把它的 100% 当成 V9 的电量。
+            Check(hfpOtherId.IndexOf(V9Protocol.HfpServiceUuid,
+                    StringComparison.OrdinalIgnoreCase) >= 0, "别的耳机也命中 HFP 服务 UUID（故不能只按 UUID 认）");
             Check(hfpOtherName.IndexOf(V9Protocol.BluetoothFriendlyNameKeyword,
                     StringComparison.OrdinalIgnoreCase) < 0, "别的耳机不会被「MCHOSE V9」关键字命中");
 

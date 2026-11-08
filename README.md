@@ -36,7 +36,7 @@ MCHOSE_Battery/
 | `tools/ilasm/` | `ildasm` / `ilasm`，用于给托管 DLL 注入原生导出 |
 | `build_plugin.py` | 构建插件：`dotnet build` → `ildasm` → 注入 `.export` → `ilasm` → 校验 |
 | `build_package.py` | 打包：编码转换 → 生成 `RMSKIN.ini` → 压缩 → 追加 footer → 自检 |
-| `tests/ProtocolTests/` | 协议与状态机的可执行测试（220 项） |
+| `tests/ProtocolTests/` | 协议与状态机的可执行测试（221 项） |
 | `preview.png` | 实际运行截图 |
 | `make_icons.py` | 生成卡片配色图标（12 张产品图） |
 
@@ -409,13 +409,13 @@ python build_plugin.py --arch x86     # x86 -> dist/plugin/MCHOSE_Battery-32.dll
 python build_plugin.py --arch both    # 两个一起出
 python build_plugin.py --install       # x64 顺带复制到 Rainmeter 的 Plugins 目录
 python build_package.py --install      # 打包 + 安装皮肤与插件
-cd tests/ProtocolTests && dotnet run -c Release   # 220 项协议/状态机断言
+cd tests/ProtocolTests && dotnet run -c Release   # 221 项协议/状态机断言
 ```
 
 ### 持续集成
 
 `.github/workflows/build.yml` 在 push 到 main、打 tag、PR 与手动触发时执行：
-跑 220 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
+跑 221 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
 
 workflow **只构建、不发布**：权限只有 `contents: read`，也刻意不调用任何 Release 接口。
 发版仍由人工执行，避免 CI 拿到写权限：

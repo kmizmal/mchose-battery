@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import struct
 import sys
@@ -141,7 +142,82 @@ def verify_package(package: Path) -> None:
 
 
 # 运行期缓存：安装时不要用包里的旧值覆盖用户当前的最后读数
-RUNTIME_FILES = {"v7-state.txt"}
+# 运行期缓存：安装时不要用包里的旧值覆盖用户当前的最后读数
+RUNTIME_FILES = {"v7-state.txt", "v9-state.txt"}
+
+
+class InstallError(RuntimeError):
+    """安装过程中不可静默跳过的失败。"""
+
+
+def sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest().upper()
+
+
+def ensure_dll_replaceable(target: Path) -> None:
+    """确认目标 DLL 可被替换；被 Rainmeter 占用时直接失败。
+
+    为什么必须硬失败：DLL 被占用时 copy 抛 PermissionError，而旧的实现只打印
+    一行警告就返回 0。皮肤 ini 确实换成了新版，DLL 却还是旧的 ——「元数据对了、
+    功能没对」，排查时会一路怀疑协议实现。宁可在安装阶段就炸出来。
+    """
+    if not target.exists():
+        return
+    try:
+        with target.open("r+b"):
+            pass
+    except PermissionError:
+        raise InstallError(
+            f"插件 DLL 被占用，无法覆盖：{target}\n"
+            "  Rainmeter 正在加载它。请完全退出 Rainmeter（托盘图标右键退出）后重装。"
+        ) from None
+
+
+def install_plugin(plugin_target: Path) -> None:
+    """复制插件 DLL 并校验哈希，任何一步不符都算失败。"""
+    plugins_dir = plugin_target.parent
+    if not plugins_dir.exists():
+        raise InstallError(
+            f"找不到 Rainmeter 插件目录：{plugins_dir}\n"
+            "  确认 Rainmeter 装在这里，或用 --plugin-dir 指定。"
+        )
+
+    ensure_dll_replaceable(plugin_target)
+
+    expected = sha256(PLUGIN_DLL)
+    backup = None
+    if plugin_target.exists():
+        backup = plugin_target.with_suffix(".dll.preinstall")
+        shutil.copy2(plugin_target, backup)
+
+    try:
+        shutil.copy2(PLUGIN_DLL, plugin_target)
+    except PermissionError:
+        raise InstallError(
+            f"复制插件 DLL 失败（被占用）：{plugin_target}\n"
+            "  请完全退出 Rainmeter 后重试。"
+        ) from None
+
+    actual = sha256(plugin_target)
+    if actual != expected:
+        if backup is not None:
+            shutil.copy2(backup, plugin_target)
+            print(f"！已回滚到备份：{backup}")
+        raise InstallError(
+            "插件 DLL 校验失败，安装未生效：\n"
+            f"  期望 {expected}\n"
+            f"  实际 {actual}\n"
+            f"  目标 {plugin_target}"
+        )
+
+    print(f"插件校验通过：{plugin_target}")
+    print(f"  sha256 {actual}")
+    if backup is not None:
+        print(f"  旧版已备份：{backup}")
 
 
 def install(config_dir: Path) -> tuple[Path, Path]:
@@ -149,6 +225,9 @@ def install(config_dir: Path) -> tuple[Path, Path]:
 
     不走「删除旧目录再复制」：Rainmeter 正加载皮肤时目录/图片可能被占用，
     删除会失败。改成逐文件覆盖，再清掉源里已经不存在的残留文件。
+
+    插件 DLL 与皮肤走不同的宿主行为：皮肤是纯读取，DLL 会被进程锁住。
+    因此 DLL 那一步必须校验 + 硬失败，不能像皮肤那样尽力而为。
     """
     skins = Path.home() / "Documents" / "Rainmeter" / "Skins" / CONFIG
     skins.mkdir(parents=True, exist_ok=True)
@@ -168,19 +247,20 @@ def install(config_dir: Path) -> tuple[Path, Path]:
                 pass
 
     plugin_target = RAINMETER_PLUGINS / f"{PLUGIN_NAME}.dll"
-    if RAINMETER_PLUGINS.exists():
-        try:
-            shutil.copy2(PLUGIN_DLL, plugin_target)
-        except PermissionError:
-            print(f"！插件 DLL 被占用，未覆盖：{plugin_target}")
-            print("  退出 Rainmeter 后再运行一次 --install，或手动替换。")
+    install_plugin(plugin_target)
     return skins, plugin_target
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="打包 MCHOSE_Battery 雨滴皮肤与插件（V7 鼠标 + G87 键盘）")
+    global RAINMETER_PLUGINS
+
+    ap = argparse.ArgumentParser(description="打包 MCHOSE_Battery 雨滴皮肤与插件（V7 鼠标 / G87 键盘 / V9 耳机）")
     ap.add_argument("--install", action="store_true", help="同时安装到本机 Rainmeter")
+    ap.add_argument("--plugin-dir", type=Path, default=RAINMETER_PLUGINS,
+                    help=f"Rainmeter 插件目录（默认 {RAINMETER_PLUGINS}）")
     args = ap.parse_args()
+
+    RAINMETER_PLUGINS = args.plugin_dir
 
     config_dir = stage()
     package = build_package(config_dir)
@@ -189,10 +269,15 @@ def main() -> int:
     print(f"已生成: {package}  ({size:.1f} KB)")
 
     if args.install:
-        skins, plugin = install(config_dir)
+        try:
+            skins, plugin = install(config_dir)
+        except InstallError as exc:
+            print(f"\n安装失败：{exc}", file=sys.stderr)
+            return 1
         print(f"已安装皮肤: {skins}")
         print(f"已安装插件: {plugin}")
     return 0
+
 
 
 if __name__ == "__main__":

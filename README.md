@@ -25,7 +25,7 @@ MCHOSE_Battery/
 
 ## 交付内容
 
-日常使用只需要安装包 `MCHOSE_Battery_1.2.rmskin`（皮肤 + 插件 DLL），从
+日常使用只需要安装包 `MCHOSE_Battery_1.3.rmskin`（皮肤 + 插件 DLL），从
 [Releases](https://github.com/kmizmal/mchose-battery/releases) 下载后双击安装。仓库内的源码结构：
 
 | 路径 | 说明 |
@@ -421,7 +421,7 @@ workflow **只构建、不发布**：权限只有 `contents: read`，也刻意�
 发版仍由人工执行，避免 CI 拿到写权限：
 
 ```bash
-gh release create v1.2.0 dist/MCHOSE_Battery_1.2.rmskin --notes-file notes.md
+gh release create v1.3.0 dist/MCHOSE_Battery_1.3.rmskin --notes-file notes.md
 ```
 
 两个产物的差异只在 PE 头和 CLR 标志，源码完全相同：

@@ -31,7 +31,10 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 CONFIG = "MCHOSE_Battery"
-PACKAGE_NAME = "MCHOSE_Battery_1.2"
+# 版本号唯一源头：包名、rmskin 元数据都从这里派生，别再各写一份。
+# 皮肤 ini 的 [Metadata] Version 也要跟着改（Rainmeter 管理界面显示的是它，不是包版本）。
+VERSION = "1.3"
+PACKAGE_NAME = f"MCHOSE_Battery_{VERSION}"
 PLUGIN_NAME = "MCHOSE_Battery"
 UTF16_SUFFIXES = {".ini", ".inc"}
 
@@ -43,13 +46,13 @@ RAINMETER_PLUGINS = Path.home() / "AppData" / "Local" / "Programs" / "Rainmeter"
 
 RMSKIN_INI = """[rmskin]
 Name=MCHOSE Battery
-Author=WorkBuddy
-Version=1.2
+Author=kmizmal
+Version={version}
 LoadType=Skin
 Load={config}\\Keyboard\\G87Battery.ini
 MinimumRainmeter=4.5
 MinimumWindows=10
-""".format(config=CONFIG)
+""".format(config=CONFIG, version=VERSION)
 
 
 def stage() -> Path:

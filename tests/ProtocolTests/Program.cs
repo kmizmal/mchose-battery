@@ -707,7 +707,44 @@ namespace MchoseBattery.Tests
                 CheckEqual(reading.Percent, 86, "V9 有线档电量 86%");
                 CheckEqual(reading.Asleep, false, "V9 有线档非休眠");
             }
+
+            // 蓝牙档：耳机走经典蓝牙，没有 0xFF07 厂商集合，也没有 BLE HID 身份。
+            // 唯一可读的是系统映射到 HFP 节点上的 DEVPKEY_Bluetooth_Battery。
+            //
+            // 识别方式：不写 MAC（每台机器不同），改按系统给的友好名匹配。
+            CheckEqual(V9Protocol.BluetoothFriendlyNameKeyword, "MCHOSE V9", "V9 蓝牙节点识别关键字");
+            CheckEqual(V9Protocol.HfpServiceUuid, "{0000111E-", "HFP AudioGateway 服务 UUID 前缀");
+
+            // 本机真机节点（2026-11-08 实测，HFP + 电池属性 80%）
+            string hfpSelfId =
+                "BTHENUM\\{0000111E-0000-1000-8000-00805F9B34FB}_VID&000102B0_PID&0000" +
+                "\\8&389A8148&0&111122342037_C00000000";
+            string hfpSelfName = "MCHOSE V9 Pro 2 Hands-Free AG";
+            Check(hfpSelfId.IndexOf(V9Protocol.HfpServiceUuid,
+                    StringComparison.OrdinalIgnoreCase) >= 0, "V9 节点命中 HFP 服务 UUID");
+            Check(hfpSelfName.IndexOf(V9Protocol.BluetoothFriendlyNameKeyword,
+                    StringComparison.OrdinalIgnoreCase) >= 0, "V9 节点命中「MCHOSE V9」关键字");
+
+            // 机器上还有一只别的蓝牙耳机（Furina，同样有 HFP 节点 + 电池属性 100%），
+            // 认错设备会把 100% 当成耳机电量。COD 都是 0x240404，只能靠名字区分。
+            string hfpOtherId =
+                "BTHENUM\\{0000111E-0000-1000-8000-00805F9B34FB}_LOCALMFG&0002" +
+                "\\8&389A8148&0&151219004617_C00000000";
+            string hfpOtherName = "Furina Endless Solo of Solitude Hands-Free AG";
+            Check(hfpOtherName.IndexOf(V9Protocol.BluetoothFriendlyNameKeyword,
+                    StringComparison.OrdinalIgnoreCase) < 0, "别的耳机不会被「MCHOSE V9」关键字命中");
+
+            // 耳机没有 BLE HID 身份，只会挂在经典蓝牙枚举器的 HFP 服务下。
+            Check(hfpSelfId.StartsWith("BTHENUM\\{0000111E-", StringComparison.OrdinalIgnoreCase),
+                "V9 蓝牙电池节点在 BTHENUM 的 HFP 服务下");
+
+            // 名字匹配必须大小写不敏感（系统可能回 Mchose V9 / MCHOSE V9）
+            Check("mchose v9 pro 2 hands-free ag".IndexOf(V9Protocol.BluetoothFriendlyNameKeyword,
+                    StringComparison.OrdinalIgnoreCase) >= 0, "关键字匹配大小写不敏感");
+            Check("MCHOSE V7 Hands-Free AG".IndexOf(V9Protocol.BluetoothFriendlyNameKeyword,
+                    StringComparison.OrdinalIgnoreCase) < 0, "鼠标 V7 不会被当成耳机 V9");
         }
+
 
         /// <summary>把十六进制串转成定长报告，便于用真实抓包字节写断言。</summary>
         private static byte[] Hex(string text, int length)

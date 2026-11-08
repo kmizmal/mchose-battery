@@ -37,6 +37,13 @@ namespace MchoseBattery.Hid
 
         private const uint BatteryPid = 2;
 
+        /// <summary>DEVPKEY_Device_FriendlyName（{a45c254e-…}, 14），UTF-16 字符串。</summary>
+        private static readonly Guid FriendlyNameFmtId =
+            new Guid("a45c254e-df1c-4efd-8020-67d146a850e0");
+
+        private const uint FriendlyNamePid = 14;
+        private const uint DevPropTypeString = 0x12;
+
         [StructLayout(LayoutKind.Sequential)]
         private struct DevPropKey
         {
@@ -121,15 +128,122 @@ namespace MchoseBattery.Hid
         private static bool TryReadBattery(
             string instancePrefix, out int percent, out string instanceId, out string detail)
         {
+            return TryReadBattery("BTHLE", instancePrefix, out percent, out instanceId, out detail);
+        }
+
+        /// <summary>
+        /// 在指定枚举器下找出「友好名包含 keyword」且带电池属性的设备，返回其百分比与实例 ID。
+        ///
+        /// 用于经典蓝牙耳机：它们的电池属性挂在 HFP 节点上，而 HFP 节点属于本机连着的
+        /// 所有耳机、属性里没有任何厂商信息，唯一可用的区分依据是设备自己上报的名字
+        /// （系统把它拼成「<设备名> Hands-Free AG」）。
+        ///
+        /// 不用 MAC：每台机器/每只耳机都不同；不用 COD：`0x240404` 耳机类通用，区分不了。
+        /// </summary>
+        internal static bool TryReadBatteryByName(
+            string enumerator, string serviceUuidPrefix, string nameKeyword,
+            out int percent, out string instanceId, out string friendlyName, out string detail)
+        {
+            percent = 0;
+            instanceId = null;
+            friendlyName = null;
+            detail = null;
+
+            IntPtr set = SetupDiGetClassDevsW(IntPtr.Zero, enumerator, IntPtr.Zero,
+                                             DigcfPresent | DigcfAllClasses);
+            if (set == NativeHid.InvalidHandleValue)
+            {
+                detail = "打开 " + enumerator + " 设备集合失败";
+                return false;
+            }
+
+            try
+            {
+                var did = new SpDevInfoData();
+                did.CbSize = Marshal.SizeOf(typeof(SpDevInfoData));
+
+                for (uint index = 0; SetupDiEnumDeviceInfo(set, index, ref did); index++)
+                {
+                    string id = GetInstanceId(set, ref did);
+                    if (string.IsNullOrEmpty(id) ||
+                        id.IndexOf(serviceUuidPrefix, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+
+                    string name = GetFriendlyName(set, ref did);
+                    if (string.IsNullOrEmpty(name) ||
+                        name.IndexOf(nameKeyword, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+
+                    int value;
+                    if (TryReadProperty(set, ref did, out value, out detail))
+                    {
+                        percent = value;
+                        instanceId = id;
+                        friendlyName = name;
+                        return true;
+                    }
+                }
+
+                if (detail == null)
+                {
+                    detail = "未找到名字含「" + nameKeyword + "」的 " + enumerator + " 节点";
+                }
+                return false;
+            }
+            finally
+            {
+                SetupDiDestroyDeviceInfoList(set);
+            }
+        }
+
+        /// <summary>读设备友好名（DEVPKEY_Device_FriendlyName）。</summary>
+        private static string GetFriendlyName(IntPtr set, ref SpDevInfoData did)
+        {
+            var key = new DevPropKey { FmtId = FriendlyNameFmtId, Pid = FriendlyNamePid };
+            var buffer = new byte[512];
+            uint type;
+            int required;
+
+            if (!SetupDiGetDevicePropertyW(set, ref did, ref key, out type, buffer,
+                                           buffer.Length, out required, 0))
+            {
+                return null;
+            }
+            if (type != DevPropTypeString)
+            {
+                return null;
+            }
+            // 含结尾的 UTF-16 NUL
+            int len = Math.Max(0, required - 2);
+            return Encoding.Unicode.GetString(buffer, 0, len);
+        }
+
+
+        /// <summary>
+        /// 在指定枚举器下按实例 ID 前缀定位设备并读电池属性。
+        ///
+        /// 枚举器不能写死：BLE HID 设备（鼠标/键盘）挂在 `BTHLE`，而经典蓝牙
+        /// 多协议设备（耳机）的电池由 HFP 节点承载，挂在 `BTHENUM`
+        /// （实例 ID 形如 `BTHENUM\{0000111E-…}_VID&…\…`）。两者读的是同一个
+        /// DEVPKEY，只是宿主节点不同。
+        /// </summary>
+        internal static bool TryReadBattery(
+            string enumerator, string instancePrefix,
+            out int percent, out string instanceId, out string detail)
+        {
             percent = 0;
             instanceId = null;
             detail = null;
 
-            IntPtr set = SetupDiGetClassDevsW(IntPtr.Zero, "BTHLE", IntPtr.Zero,
+            IntPtr set = SetupDiGetClassDevsW(IntPtr.Zero, enumerator, IntPtr.Zero,
                                              DigcfPresent | DigcfAllClasses);
             if (set == NativeHid.InvalidHandleValue)
             {
-                detail = "打开 BTHLE 设备集合失败";
+                detail = "打开 " + enumerator + " 设备集合失败";
                 return false;
             }
 

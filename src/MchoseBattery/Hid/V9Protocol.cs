@@ -52,6 +52,20 @@ namespace MchoseBattery.Hid
             return productId == WiredProductId ? "有线" : "2.4G";
         }
 
+        /// <summary>
+        /// 蓝牙档 HFP 节点的识别关键字。
+        ///
+        /// 识别方式：系统给该节点起的友好名是「<设备名> Hands-Free AG」，
+        /// 耳机上报的设备名是 `MCHOSE V9 Pro 2`，故匹配「MCHOSE V9」即可。
+        ///
+        /// 为什么不写 MAC：MAC 每台机器、每只耳机都不同，写死等于把插件绑死在一台机器上。
+        /// 为什么不用 COD：`0x240404`（Major=4 耳机 / Minor=1）与别的耳机完全一样，区分不了。
+        /// </summary>
+        internal const string BluetoothFriendlyNameKeyword = "MCHOSE V9";
+
+        /// <summary>HFP AudioGateway 服务的标准 UUID 前缀（节点实例 ID 里的 `{0000111E-…}`）。</summary>
+        internal const string HfpServiceUuid = "{0000111E-";
+
         /// <summary>厂商用途页。实测 0xFF07，与鼠标(0xFF01)、键盘(0xFF00/0xFF04)都不同。</summary>
         internal const int UsagePage = 0xFF07;
 

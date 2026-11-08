@@ -35,11 +35,20 @@ namespace MchoseBattery.Hid
 
             if (targets.Count == 0)
             {
+                // 蓝牙档没有 0xFF07 厂商集合，USB 身份整个消失；但耳机仍在经典蓝牙上
+                // 连着，系统会把它的 GATT Battery Level 映射到 HFP 节点的
+                // DEVPKEY_Bluetooth_Battery 上，可以直接读到百分比。
+                CollectResult viaBluetooth = QueryBluetooth();
+                if (viaBluetooth != null)
+                {
+                    return viaBluetooth;
+                }
+
                 return new CollectResult
                 {
                     Ok = false,
                     Reason = "absent",
-                    Detail = "未找到 VID_3837 的 0xFF07 厂商接口（6011 接收器 / 6010 有线）",
+                    Detail = "未找到 VID_3837 的 0xFF07 厂商接口（6011 接收器 / 6010 有线），且无蓝牙电池属性",
                 };
             }
 
@@ -135,6 +144,51 @@ namespace MchoseBattery.Hid
             });
 
             return targets;
+        }
+
+        /// <summary>
+        /// 蓝牙档回退：耳机走经典蓝牙时不暴露任何厂商 HID 集合，也没有 BLE HID 身份。
+        /// 此时唯一可读的是系统映射的电池属性（与鼠标 BLE 路径同一个 DEVPKEY），
+        /// 宿主节点却是 HFP（`{0000111E-…}`，挂在 BTHENUM 而不是 BTHLE）。
+        ///
+        /// 只在设备真的通过蓝牙连着时才存在该节点，因此读到即视为在线；
+        /// 未命中返回 null，交回调用方给出原有「已断开」文案。
+        /// </summary>
+        private static CollectResult QueryBluetooth()
+        {
+            int percent;
+            string instanceId;
+            string friendlyName;
+            string detail;
+
+            try
+            {
+                // 耳机蓝牙档的电池属性挂在 HFP 节点上；该节点属于本机连着的所有耳机，
+                // 属性里没有厂商信息，只能靠系统给的友好名（<设备名> Hands-Free AG）认设备。
+                if (!BleBattery.TryReadBatteryByName(
+                        "BTHENUM", V9Protocol.HfpServiceUuid,
+                        V9Protocol.BluetoothFriendlyNameKeyword,
+                        out percent, out instanceId, out friendlyName, out detail))
+                {
+                    return null;
+                }
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+
+            return new CollectResult
+            {
+                Ok = true,
+                Percent = percent,
+                Charging = false,
+                // 系统只给百分比，没有充放电方向；与鼠标蓝牙路径同一口径。
+                ChargingKnown = false,
+                ConnectMode = "蓝牙",
+                Reason = "ok",
+                Detail = string.Format("HFP Battery {0}% · {1} · {2}", percent, friendlyName, instanceId),
+            };
         }
 
         private static int ChannelRank(int productId)

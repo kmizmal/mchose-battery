@@ -66,6 +66,68 @@ namespace MchoseBattery.Hid
         /// <summary>HFP AudioGateway 服务的标准 UUID 前缀（节点实例 ID 里的 `{0000111E-…}`）。</summary>
         internal const string HfpServiceUuid = "{0000111E-";
 
+        /// <summary>
+        /// 从 BTHENUM 服务节点实例 ID 中提取经典蓝牙地址。
+        ///
+        /// 实例 ID 形如 `BTHENUM\{0000111E-…}_VID&…\8&389A8148&0&111122342037_C00000000`，
+        /// 尾段 `<12 位十六进制>_C…` 里的 hex 就是地址的 MSB-first 显示序
+        /// （2026-11-10 实证：`&111122342037_` → WinRT BluetoothAddress 0x111122342037，无需翻转字节序）。
+        ///
+        /// 用途：拿到地址后走 WinRT `BluetoothDevice.ConnectionStatus` 验真实链路——
+        /// HFP 节点在耳机断开后仍常驻且电池属性残留旧值，「读得到属性」≠「设备在线」。
+        /// 解析失败返回 false，调用方应按「无法确认连接状态」降级处理，不要当断开。
+        /// </summary>
+        internal static bool TryParseAddressFromInstanceId(string instanceId, out ulong address)
+        {
+            address = 0;
+            if (string.IsNullOrEmpty(instanceId))
+            {
+                return false;
+            }
+
+            int amp = instanceId.LastIndexOf('&');
+            if (amp < 0)
+            {
+                return false;
+            }
+
+            int underscore = instanceId.IndexOf('_', amp + 1);
+            string candidate = underscore < 0
+                ? instanceId.Substring(amp + 1)
+                : instanceId.Substring(amp + 1, underscore - amp - 1);
+            if (candidate.Length != 12)
+            {
+                return false;
+            }
+
+            ulong value = 0;
+            for (int i = 0; i < candidate.Length; i++)
+            {
+                char c = candidate[i];
+                uint digit;
+                if (c >= '0' && c <= '9')
+                {
+                    digit = (uint)(c - '0');
+                }
+                else if (c >= 'a' && c <= 'f')
+                {
+                    digit = (uint)(c - 'a' + 10);
+                }
+                else if (c >= 'A' && c <= 'F')
+                {
+                    digit = (uint)(c - 'A' + 10);
+                }
+                else
+                {
+                    return false;
+                }
+                value = (value << 4) | digit;
+            }
+
+            address = value;
+            return true;
+        }
+
         /// <summary>厂商用途页。实测 0xFF07，与鼠标(0xFF01)、键盘(0xFF00/0xFF04)都不同。</summary>
         internal const int UsagePage = 0xFF07;
 

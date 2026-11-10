@@ -151,8 +151,11 @@ namespace MchoseBattery.Hid
         /// 此时唯一可读的是系统映射的电池属性（与鼠标 BLE 路径同一个 DEVPKEY），
         /// 宿主节点却是 HFP（`{0000111E-…}`，挂在 BTHENUM 而不是 BTHLE）。
         ///
-        /// 只在设备真的通过蓝牙连着时才存在该节点，因此读到即视为在线；
-        /// 未命中返回 null，交回调用方给出原有「已断开」文案。
+        /// ⚠ 节点存在 ≠ 设备在线（2026-11-10 纠错）：断开蓝牙后 HFP 节点仍常驻
+        /// （`AlwaysShowDeviceAsConnected=True`）且电池属性残留旧值，「读到即在线」
+        /// 会把断开误判成已连接。必须再用 WinRT `ConnectionStatus` 验真实链路：
+        /// 明确 Disconnected → 返回 null（回落 absent，皮肤显示断开+最后读数）；
+        /// 无法确认（解析/查询失败）→ 保留读数避免误报断开，原因写进 Detail。
         /// </summary>
         private static CollectResult QueryBluetooth()
         {
@@ -178,6 +181,29 @@ namespace MchoseBattery.Hid
                 return null;
             }
 
+            // 验真实链路：属性可能是断开后的残留值。
+            string linkNote;
+            ulong address;
+            bool connected;
+            string linkDetail = null;
+            if (V9Protocol.TryParseAddressFromInstanceId(instanceId, out address)
+                && BthLink.TryIsConnected(address, out connected, out linkDetail))
+            {
+                if (!connected)
+                {
+                    // 明确断开：HFP 节点与电池属性都是残留，按不在场处理。
+                    return null;
+                }
+                linkNote = "conn=" + linkDetail;
+            }
+            else
+            {
+                // 无法确认连接状态：保留读数（宁多显示不误报断开），把原因留给日志。
+                linkNote = linkDetail == null
+                    ? "conn=unknown"
+                    : "conn=unknown(" + linkDetail + ")";
+            }
+
             return new CollectResult
             {
                 Ok = true,
@@ -187,7 +213,8 @@ namespace MchoseBattery.Hid
                 ChargingKnown = false,
                 ConnectMode = "蓝牙",
                 Reason = "ok",
-                Detail = string.Format("HFP Battery {0}% · {1} · {2}", percent, friendlyName, instanceId),
+                Detail = string.Format("HFP Battery {0}% · {1} · {2} · {3}",
+                                       percent, friendlyName, instanceId, linkNote),
             };
         }
 

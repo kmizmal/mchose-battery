@@ -747,6 +747,34 @@ namespace MchoseBattery.Tests
                     StringComparison.OrdinalIgnoreCase) >= 0, "关键字匹配大小写不敏感");
             Check("MCHOSE V7 Hands-Free AG".IndexOf(V9Protocol.BluetoothFriendlyNameKeyword,
                     StringComparison.OrdinalIgnoreCase) < 0, "鼠标 V7 不会被当成耳机 V9");
+
+            // 连接状态纠偏（2026-11-10 修复「断开仍显示已连接」）：
+            // 耳机断开后 HFP 节点仍常驻（AlwaysShowDeviceAsConnected=True）且电池属性
+            // 残留旧值（实测断开仍读到 80%），「读得到属性」不能当在线，必须拿实例 ID
+            // 里的蓝牙地址走 WinRT ConnectionStatus 验真实链路。这里覆盖纯解析层。
+            ulong addr;
+            Check(V9Protocol.TryParseAddressFromInstanceId(hfpSelfId, out addr),
+                "V9 HFP 节点实例 ID 可解析出蓝牙地址");
+            CheckEqual(addr, 0x111122342037UL, "V9 地址=111122342037（hex 即地址本序，无需翻转）");
+            Check(V9Protocol.TryParseAddressFromInstanceId(hfpOtherId, out addr),
+                "别的耳机 HFP 节点实例 ID 可解析出蓝牙地址");
+            CheckEqual(addr, 0x151219004617UL, "别的耳机地址=151219004617");
+            Check(V9Protocol.TryParseAddressFromInstanceId(
+                    @"BTHENUM\{0000111E-0000-1000-8000-00805F9B34FB}_VID&000102B0_PID&0000" +
+                    @"\8&389A8148&0&abcdef123456_C00000000", out addr),
+                "小写十六进制地址可解析");
+            CheckEqual(addr, 0xABCDEF123456UL, "小写十六进制地址值正确");
+            Check(!V9Protocol.TryParseAddressFromInstanceId(null, out addr), "null 实例 ID 被拒绝");
+            Check(!V9Protocol.TryParseAddressFromInstanceId("", out addr), "空实例 ID 被拒绝");
+            Check(!V9Protocol.TryParseAddressFromInstanceId(
+                    @"BTHENUM\DEV_111122342037\8&389A8148&0&BLUETOOTHDEVICE_111122342037", out addr),
+                "根节点（BLUETOOTHDEVICE 尾段）不会误解析成地址");
+            Check(!V9Protocol.TryParseAddressFromInstanceId(
+                    @"BTHENUM\{0000111E-0000-1000-8000-00805F9B34FB}\8&389A8148&0&11112234203_C00000000", out addr),
+                "11 位 hex（长度不足）被拒绝");
+            Check(!V9Protocol.TryParseAddressFromInstanceId(
+                    @"BTHENUM\{0000111E-0000-1000-8000-00805F9B34FB}\8&389A8148&0&11112234203G_C00000000", out addr),
+                "非 hex 字符被拒绝");
         }
 
 

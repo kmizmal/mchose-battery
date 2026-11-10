@@ -36,7 +36,7 @@ MCHOSE_Battery/
 | `tools/ilasm/` | `ildasm` / `ilasm`，用于给托管 DLL 注入原生导出 |
 | `build_plugin.py` | 构建插件：`dotnet build` → `ildasm` → 注入 `.export` → `ilasm` → 校验 |
 | `build_package.py` | 打包：编码转换 → 生成 `RMSKIN.ini` → 压缩 → 追加 footer → 自检 |
-| `tests/ProtocolTests/` | 协议与状态机的可执行测试（221 项） |
+| `tests/ProtocolTests/` | 协议与状态机的可执行测试（232 项） |
 | `preview.png` | 实际运行截图 |
 | `make_icons.py` | 生成卡片配色图标（12 张产品图） |
 
@@ -409,13 +409,13 @@ python build_plugin.py --arch x86     # x86 -> dist/plugin/MCHOSE_Battery-32.dll
 python build_plugin.py --arch both    # 两个一起出
 python build_plugin.py --install       # x64 顺带复制到 Rainmeter 的 Plugins 目录
 python build_package.py --install      # 打包 + 安装皮肤与插件
-cd tests/ProtocolTests && dotnet run -c Release   # 221 项协议/状态机断言
+cd tests/ProtocolTests && dotnet run -c Release   # 232 项协议/状态机断言
 ```
 
 ### 持续集成
 
 `.github/workflows/build.yml` 在 push 到 main、打 tag、PR 与手动触发时执行：
-跑 221 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
+跑 232 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
 
 workflow **只构建、不发布**：权限只有 `contents: read`，也刻意不调用任何 Release 接口。
 发版仍由人工执行，避免 CI 拿到写权限：
@@ -464,6 +464,7 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
 | 耳机卡片一直「已断开」 | 耳机连着蓝牙、没连上接收器 | 把耳机拨到 2.4G 并确认官方客户端能识别；接收器枚举正常不代表链路已建立 |
 | 耳机写入成功但零回包 | 套用了鼠标 `0x4D` / 键盘 `0x13` 帧 | 耳机是 `0x55` 报告 + `0xAA` 起始符 + 命令 `0x0B` |
 | 刷新节奏不对 | 改了 `RefreshMinutes` 没刷新皮肤 | 右键 → 刷新皮肤 |
+| 耳机蓝牙断开后仍显示「蓝牙」 | HFP 节点常驻 + 电池属性是残留值 | 确认已更新到 v1.3.x（含 WinRT 链路校验）；旧版没有这层判断 |
 
 ## 八、已知限制
 
@@ -527,6 +528,22 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
         关键字匹配能正确排除它，不会把 100% 当成耳机电量。
       - 与鼠标蓝牙路径同一口径：只有百分比、没有充放电方向，`Charging` 输出 `2`（未知），
         皮肤按空串处理。
+      - **节点存在 ≠ 设备在线（2026-11-10 修复）**：断开蓝牙后 HFP 节点**不会消失**，
+        仍为 `Status=OK`、`IsPresent=True`，而且节点上的电池属性**残留断开前的旧值**
+        （实测断开后仍读 80%）；根节点的 `DEVPKEY_DeviceContainer_AlwaysShowDeviceAsConnected`
+        恒为 `True`。因此「读得到属性」不能当「设备在线」——旧实现就是这么一直显示「蓝牙 80%」的。
+        现在读到属性后还会用 WinRT 再验一次真实链路：
+
+        | WinRT `BluetoothDevice.ConnectionStatus` | 插件行为 |
+        | --- | --- |
+        | `Connected` | 正常出读数，`Detail` 带 `conn=Connected` |
+        | `Disconnected` | 返回 `absent`，卡片回落「已断开 + 最后读数」 |
+        | 查询失败/超时 | 保留读数并标 `conn=unknown(…)`，宁可多显示也不误报断开 |
+
+        蓝牙地址从 HFP 节点实例 ID 尾段 `&<12 位十六进制>_C…` 取，该 hex 就是地址的
+        MSB-first 显示序（`&111122342037_` → `0x111122342037`，**不需要翻转字节序**）。
+        实现见 `Hid/BthLink.cs`，只引用系统自带的拆分 winmd，不引 NuGet。
+        断开态实测 `Ok=False Reason=absent`，耗时 62 ms。
       - 已知限制：识别依赖耳机上报的设备名，若厂商改名（或买的是同系列别的型号）需调关键字。
     - 耳机没有 Feature 报告，`GetFeature` 路径不可用；别套用鼠标的 `0x4D` 或键盘的 `0x13`。
 

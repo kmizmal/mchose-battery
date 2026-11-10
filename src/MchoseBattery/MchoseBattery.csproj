@@ -22,11 +22,29 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Product>MCHOSE Battery Rainmeter Plugin</Product>
     <AssemblyTitle>MCHOSE_Battery</AssemblyTitle>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
     <!-- Finalize 是导出名，不能改名 -->
     <NoWarn>$(NoWarn);CS0465</NoWarn>
   </PropertyGroup>
+
+  <!--
+    蓝牙档连接状态判定要用 WinRT BluetoothDevice.ConnectionStatus（见 Hid\BthLink.cs）。
+    引用系统自带的拆分 winmd（Win10/11 均随 OS 提供），不引 NuGet 包。
+    注意别换成 GAC 的 System.Runtime.WindowsRuntime + AsTask：那份绑定 union
+    Windows.winmd，与拆分 winmd 类型标识冲突（CS0012）；本项目 IL 往返后
+    直接挂 Completed 回调同步等待即可。
+  -->
+  <ItemGroup>
+    <Reference Include="Windows.Foundation">
+      <HintPath>C:\Windows\System32\WinMetadata\Windows.Foundation.winmd</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Windows.Devices">
+      <HintPath>C:\Windows\System32\WinMetadata\Windows.Devices.winmd</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
 
 </Project>

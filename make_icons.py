@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """把官方产品渲染图处理成皮肤用的左上角图标。
 
 做三件事：
@@ -39,9 +38,9 @@ KB_COLORWAYS = {
     "pink": "https://cdn.mchose.com.cn/configCenter/static/images/G87PinkSideFull_01718a2db8cd.png",
 }
 
-ICON_H = 104        # 2× 显示高度（鼠标图按 H=52 使用，高 DPI 下不虚）
-ICON_W = 84         # 2× 显示宽度（键盘图按 W=42 使用）
-PAD_RATIO = 0.04    # 裁剪后补的内边距，占短边比例
+ICON_H = 104  # 2× 显示高度（鼠标图按 H=52 使用，高 DPI 下不虚）
+ICON_W = 84  # 2× 显示宽度（键盘图按 W=42 使用）
+PAD_RATIO = 0.04  # 裁剪后补的内边距，占短边比例
 
 # V9 Pro 2 耳机：官方图同样是横向（640×352），但耳机较宽，按宽度收到 120 像素，
 # 否则会压到右上角的连接状态胶囊。四档取官方在售配色（蓝/黑/红/绿）。
@@ -52,7 +51,7 @@ HEADSET_COLORWAYS = {
     "green": "https://cdn.mchose.com.cn/configCenter/static/images/v9pro2Green_222954fd35a4.png",
 }
 
-ICON_W_HS = 120     # 2× 显示宽度（耳机图按 W=60 使用）
+ICON_W_HS = 120  # 2× 显示宽度（耳机图按 W=60 使用）
 
 ROOT = Path(__file__).resolve().parent
 CACHE = ROOT / "_icon_src"
@@ -73,7 +72,9 @@ def trim(image: Image.Image) -> Image.Image:
         return image
     cropped = image.crop(box)
     pad = int(min(cropped.size) * PAD_RATIO)
-    canvas = Image.new("RGBA", (cropped.width + pad * 2, cropped.height + pad * 2), (0, 0, 0, 0))
+    canvas = Image.new(
+        "RGBA", (cropped.width + pad * 2, cropped.height + pad * 2), (0, 0, 0, 0)
+    )
     canvas.paste(cropped, (pad, pad))
     return canvas
 
@@ -107,21 +108,27 @@ def main() -> int:
         icon = scale(trim(src))
         target = OUT / f"mouse-{name}.png"
         icon.save(target, optimize=True)
-        print(f"mouse-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB")
+        print(
+            f"mouse-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB"
+        )
 
     for name, url in KB_COLORWAYS.items():
         src = fetch(url, CACHE / f"G87_{name}.png")
         icon = scale_w(trim(src))
         target = OUT / f"keyboard-{name}.png"
         icon.save(target, optimize=True)
-        print(f"keyboard-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB")
+        print(
+            f"keyboard-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB"
+        )
 
     for name, url in HEADSET_COLORWAYS.items():
         src = fetch(url, CACHE / f"V9P2_{name}.png")
         icon = scale_ws(trim(src))
         target = OUT / f"headset-{name}.png"
         icon.save(target, optimize=True)
-        print(f"headset-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB")
+        print(
+            f"headset-{name:6s} {src.size} -> {icon.size}  {target.stat().st_size // 1024} KB"
+        )
 
     return 0
 

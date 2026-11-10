@@ -3,7 +3,7 @@
 [![build](https://github.com/kmizmal/mchose-battery/actions/workflows/build.yml/badge.svg)](https://github.com/kmizmal/mchose-battery/actions/workflows/build.yml)
 
 显示迈从 **V7 鼠标**、**G87 键盘** 与 **V9 Pro 2 耳机** 的连接方式、剩余电量、充放电状态，并在掉线/低电时给出明确提示。
-数据由随包安装的原生 **C# 插件** 直接读 HID / BLE，零外部依赖（不需要 Python、hidapi 或中间状态文件）。
+数据由随包安装的原生 **C# 插件** 直接读 HID / BLE，零外部依赖
 
 > **免责声明**：本项目是第三方开源项目，与迈从（MCHOSE）官方**没有任何关系**，也未获得其授权或认可。
 > 插件只通过公开的 HID / BLE 接口**读取**设备上报的电量与连接状态，不修改固件、不写入配置、
@@ -20,29 +20,7 @@ MCHOSE_Battery/
 └─ Headset/V9Battery.ini      Config = MCHOSE_Battery\Headset
 ```
 
-> 必须拆成独立子目录：Rainmeter 里**同一 Config 下的 variant 是互斥的**，
-> 多个 `.ini` 放同一目录时，加载后一个会把前一个替换掉。
-
-## 交付内容
-
-日常使用只需要安装包 `MCHOSE_Battery_1.3.rmskin`（皮肤 + 插件 DLL），从
-[Releases](https://github.com/kmizmal/mchose-battery/releases) 下载后双击安装。仓库内的源码结构：
-
-| 路径 | 说明 |
-| --- | --- |
-| `src/MchoseBattery/` | 插件源码（.NET Framework 4.8 / x64） |
-| `MCHOSE_Battery/` | 皮肤源码（`.ini`/`.inc` 为 UTF-8 编辑源，打包时转 UTF-16） |
-| `tools/HidProbe/` | HID 探测工具（枚举 / 抓帧 / 特征读 / 端到端验证） |
-| `tools/ilasm/` | `ildasm` / `ilasm`，用于给托管 DLL 注入原生导出 |
-| `build_plugin.py` | 构建插件：`dotnet build` → `ildasm` → 注入 `.export` → `ilasm` → 校验 |
-| `build_package.py` | 打包：编码转换 → 生成 `RMSKIN.ini` → 压缩 → 追加 footer → 自检 |
-| `tests/ProtocolTests/` | 协议与状态机的可执行测试（232 项） |
-| `preview.png` | 实际运行截图 |
-| `make_icons.py` | 生成卡片配色图标（12 张产品图） |
-
-`dist/` 与各项目的 `bin/`、`obj/` 都是可再生产物，不入库，按[第六节](#六构建)重新生成。
-
-## 一、架构
+## 架构
 
 ```
 Rainmeter 主线程                    线程池                     HID 设备
@@ -61,16 +39,13 @@ Rainmeter 主线程                    线程池                     HID 设备
                        └─▶ [MeasureUpdated]    Field=Updated
 ```
 
-关键设计：**采集永远不在主线程**。`Update` 只读一份不可变快照，到点才把一次采集丢给线程池；
-HID 往返（设备休眠时要等超时）不会卡住 Rainmeter 的任何一帧。
-
 皮肤里有两类 measure：
 
 - `[MeasureV7]` / `[MeasureG87]` —— **主实例**，不写 `Field`，负责按间隔触发采集；
 - `Field=State/Percent/PercentText/Charging/Mode/Alert/Theme/Updated/Fails/Reason/Device` —— **字段实例**，
   只读同一份共享缓存，不重复采集。
 
-## 二、数据获取逻辑
+## 数据获取逻辑
 
 设备匹配（沿用官方脚本，不写死 PID）：
 
@@ -369,7 +344,7 @@ XOR 复算 `01^03^00^01^0B^01^56 = 0x5F`、`…^01^D6 = 0xDF`，与两档帧尾�
 提示音默认关闭。`Variables.inc` 里 `SoundOn=1` 可开启：低电首次触发响一次，之后每小时最多一次，
 掉线不重复响，时间基准只在真正发声时更新。
 
-## 四、界面
+## 界面
 
 - 264 × 138 卡片，暗色（`24,26,32`）+ 细描边 + 底部投影
 - 默认整体不透明度 80%（`OpacityValue=203`），由 `OnRefreshAction` 每次刷新重新套用
@@ -379,7 +354,7 @@ XOR 复算 `01^03^00^01^0B^01^56 = 0x5F`、`…^01^D6 = 0xDF`，与两档帧尾�
   （鼠标：白 / 黑 / 红 / 粉；键盘：白 / 黑 / 青 / 粉 —— G87 官方配色里没有红色）
 - 不弹任何 ToolTip，操作说明写在 `[Metadata] Information` 与包内 `README.txt`
 
-## 五、封装方式
+## 封装方式
 
 `.rmskin` **不是**普通 zip 改名。Rainmeter 的安装器会做两处硬校验：
 
@@ -399,40 +374,18 @@ XOR 复算 `01^03^00^01^0B^01^56 = 0x5F`、`…^01^D6 = 0xDF`，与两档帧尾�
 | `%LOCALAPPDATA%\Programs\Rainmeter\Plugins\` | **实际生效** |
 | `%APPDATA%\Rainmeter\Plugins\` | 兜底，优先级低 |
 
-只更新后者等于没改（本项目实际踩过这个坑）。
+只更新后者等于没改。
 
-## 六、构建
+## 构建
 
 ```bash
+cd tests/ProtocolTests && dotnet run -c Release   # 232 项协议/状态机断言
 python build_plugin.py                # x64 -> dist/plugin/MCHOSE_Battery.dll
 python build_plugin.py --arch x86     # x86 -> dist/plugin/MCHOSE_Battery-32.dll
 python build_plugin.py --arch both    # 两个一起出
 python build_plugin.py --install       # x64 顺带复制到 Rainmeter 的 Plugins 目录
 python build_package.py --install      # 打包 + 安装皮肤与插件
-cd tests/ProtocolTests && dotnet run -c Release   # 232 项协议/状态机断言
 ```
-
-### 持续集成
-
-`.github/workflows/build.yml` 在 push 到 main、打 tag、PR 与手动触发时执行：
-跑 232 项测试 → 构建 x64 + x86 → 打包 rmskin → 校验 footer → 上传 artifact（保留 30 天）。
-
-workflow **只构建、不发布**：权限只有 `contents: read`，也刻意不调用任何 Release 接口。
-发版仍由人工执行，避免 CI 拿到写权限：
-
-```bash
-gh release create v1.3.0 dist/MCHOSE_Battery_1.3.rmskin --notes-file notes.md
-```
-
-两个产物的差异只在 PE 头和 CLR 标志，源码完全相同：
-
-| 文件 | machine | CLR flags | 适用宿主 |
-| --- | --- | --- | --- |
-| `MCHOSE_Battery.dll` | `0x8664`（PE32+） | `0x0` | 64 位 Rainmeter |
-| `MCHOSE_Battery-32.dll` | `0x014C`（PE32） | `0x2`（32BITREQUIRED） | 32 位 Rainmeter |
-
-32 位版本本机无法实机验证（这台机器上只有 64 位 Rainmeter），已校验的部分：PE 头位数、
-32BITREQUIRED 标志、6 个导出符号齐全、原生导入表只有 `mscoree.dll`（合法的 .NET 混合 DLL）。
 
 ### 打包时的文件名约束（容易踩）
 
@@ -453,7 +406,7 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
 - 如果坚持把 32 位版命名为 `MCHOSE_Battery-32.dll` 并装到 Plugins 目录，那 32 位皮肤的
   `Plugin=` 就得写成 `MCHOSE_Battery-32`，皮肤不再是双位数通用。
 
-## 七、排错
+## 排错
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
@@ -466,7 +419,7 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
 | 刷新节奏不对 | 改了 `RefreshMinutes` 没刷新皮肤 | 右键 → 刷新皮肤 |
 | 耳机蓝牙断开后仍显示「蓝牙」 | HFP 节点常驻 + 电池属性是残留值 | 确认已更新到 v1.3.x（含 WinRT 链路校验）；旧版没有这层判断 |
 
-## 八、已知限制
+## 已知限制
 
 1. **安装包默认只装 64 位**：`build_package.py` 把 x64 版放进 `Plugins/64bit/`。
    32 位插件已可构建（`--arch x86`），要在包里同时支持两种宿主，把
@@ -496,7 +449,7 @@ pluginFile = GetPluginPath() + pluginName; // 先找安装目录
 
    注：**仅插 USB 线不改变档位** —— 那是充电，数据链路不变。
    蓝牙档没有厂商 HID 通道，只能读 GATT 百分比；充电状态未知，界面不显示。
- 7. **V9 Pro 2 耳机支持 2.4G、有线、蓝牙三档**：
+7. **V9 Pro 2 耳机支持 2.4G、有线、蓝牙三档**：
     - 2.4G：接收器插着就一直枚举 `3837/0x6011` 的 `0xFF07` 通道，
       但**只有耳机真的连上接收器才代答**；没连上（切到蓝牙、或需重新配对）时
       表现与鼠标一致：接口在、问不答。
